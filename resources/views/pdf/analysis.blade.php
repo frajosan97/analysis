@@ -139,7 +139,7 @@
 <body>
     <div class="header">
         <div class="school-name">{{ $schoolName }}</div>
-        <div class="report-title">{{ $title }}</div>
+        <div class="report-title">PERFORMANCE ANALYSIS</div>
         <div class="exam-info">
             Form {{ $class }} Term {{ $exam->term->term }} {{ $exam->exam }}
         </div>
