@@ -127,9 +127,7 @@ export default function ResultsIndex({ exam, classData }) {
                     </Dropdown>
                 </Col>
             </Row>
-
             <hr className="dashed-hr mb-4" />
-
             <Row>
                 <Col xs={12}>
                     <Card className="border-0 shadow-sm">
