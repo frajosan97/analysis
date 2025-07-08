@@ -117,15 +117,11 @@ export default function ResultsIndex({ exam, classData }) {
                         <Dropdown.Menu className="border-0 shadow-sm">
                             <Dropdown.Item href={route('pdf.merit', [exam.id, classData])} target="_blank" className="d-flex align-items-center gap-2">
                                 <i className="bi bi-file-earmark-pdf text-danger"></i>
-                                Pdf
+                                Merit List - PDF
                             </Dropdown.Item>
-                            <Dropdown.Item href="#/action-2" className="d-flex align-items-center gap-2">
-                                <i className="bi bi-file-earmark-excel text-success"></i>
-                                Excel
-                            </Dropdown.Item>
-                            <Dropdown.Item href="#/action-3" className="d-flex align-items-center gap-2">
-                                <i className="bi bi-file-earmark-text"></i>
-                                Report Forms
+                            <Dropdown.Item href={route('pdf.analysis', [exam.id, classData])} target="_blank" className="d-flex align-items-center gap-2">
+                                <i className="bi bi-file-earmark-pdf text-danger"></i>
+                                Analysis - PDF
                             </Dropdown.Item>
                         </Dropdown.Menu>
                     </Dropdown>

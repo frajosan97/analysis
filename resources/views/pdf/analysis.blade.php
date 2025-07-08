@@ -18,7 +18,6 @@
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
-            text-transform: capitalize;
         }
 
         .header {
@@ -95,6 +94,7 @@
         .footer {
             margin-top: 15px;
             text-align: left;
+            text-transform: capitalize;
             font-size: 9pt;
             color: #666;
             border-top: 1px solid #ddd;
@@ -127,55 +127,134 @@
         .footer tr:nth-child(even) {
             background-color: none;
         }
+
+        .custom-table {
+            text-align: left;
+            text-transform: capitalize;
+            width: 10%;
+        }
     </style>
 </head>
 
 <body>
     <div class="header">
         <div class="school-name">{{ $schoolName }}</div>
-        <div class="report-title">MERIT LIST</div>
+        <div class="report-title">{{ $title }}</div>
         <div class="exam-info">
             Form {{ $class }} Term {{ $exam->term->term }} {{ $exam->exam }}
         </div>
         <div class="date">Generated on: {{ now()->format('d/m/Y H:i') }}</div>
     </div>
 
+    <!-- Overall Performance Summary -->
+    <h3>Overall Performance Summary</h3>
     <table>
         <thead>
             <tr>
-                <th style="text-align: left;">Adm</th>
-                <th style="text-align: left;">Student Name</th>
-                <th style="text-align: left;">Class</th>
-                <th style="text-align: left;">KCPE</th>
-                @foreach($subjects as $key => $value)
-                <th style="text-transform: capitalize;">{{ $value->systemSubject->sub_short_name }}</th>
+                <th class="custom-table">Stream</th>
+                <th class="custom-table">Mean Points</th>
+                <th class="custom-table">Grade</th>
+                @foreach($gradingSystem as $grade)
+                <th>{{ $grade->grds_grade }}</th>
                 @endforeach
-                <th>Count</th>
-                <th>Marks</th>
-                <th>Points</th>
-                <th>Avg</th>
-                <th>Grade</th>
-                <th>Postn</th>
+                <th class="custom-table">Count</th>
+                <th class="custom-table">Teacher</th>
             </tr>
         </thead>
         <tbody>
-            @foreach($students as $index => $student)
-            <tr @if($index < 3) class="highlight" @endif>
-                <td style="text-align: left;">{{ $student['adm'] }}</td>
-                <td style="text-align: left;">{{ $student['name'] }}</td>
-                <td style="text-align: left;">{{ $student['class'] }}</td>
-                <td style="text-align: left;">{{ $student['kcpe'] ?? '-' }}</td>
-                @foreach($subjects as $subject)
-                <td>
-                    {{ $student['scores'][$subject->sch_sub_code] ?? '--' }}
-                </td>
+            @foreach($overallDistribution['streams'] as $stream => $data)
+            <tr>
+                <td style="text-align: left; text-transform: capitalize;">{{ $stream }}</td>
+                <td>{{ number_format($data['mean_points'], 2) }}</td>
+                <td>{{ $data['grade'] }}</td>
+                @foreach($gradingSystem as $grade)
+                <td>{{ $data[$grade->grds_grade] }}</td>
                 @endforeach
-                <td class="total-col">{{ $student['re_subC'] }}</td>
-                <td class="total-col">{{ $student['re_tt'] }}</td>
-                <td class="total-col">{{ $student['re_pnt'] }}</td>
-                <td class="total-col">{{ $student['re_avgpnt'] }}</td>
-                <td class="total-col">{{ $student['re_grade'] }}</td>
-                <td class="total-col">{{ $student['re_fRank'] }}</td>
+                <td>{{ $data['entries'] }}</td>
+                <td></td>
+            </tr>
+            @endforeach
+            <tr class="total-col">
+                <td style="text-align: left; text-transform: capitalize;">Total/Mean</td>
+                <td>{{ number_format($overallDistribution['total']['mean_points'], 2) }}</td>
+                <td>{{ $overallDistribution['total']['grade'] }}</td>
+                @foreach($gradingSystem as $grade)
+                <td>{{ $overallDistribution['total'][$grade->grds_grade] }}</td>
+                @endforeach
+                <td>{{ $overallDistribution['total']['entries'] }}</td>
+                <td></td>
+            </tr>
+        </tbody>
+    </table>
+
+    <!-- Subject-wise Performance -->
+    <h3 style="margin-top: 20px;">Subject-wise Performance Analysis</h3>
+    @foreach($gradeDistribution as $subjectCode => $distribution)
+    <table>
+        <thead>
+            <tr>
+                <th colspan="18" style="text-align: left; text-transform: capitalize;">
+                    {{ $subjectCode }}
+                </th>
+            </tr>
+            <tr>
+                <th class="custom-table">Stream</th>
+                <th class="custom-table">Mean Points</th>
+                <th class="custom-table">Grade</th>
+                @foreach($gradingSystem as $grade)
+                <th>{{ $grade->grds_grade }}</th>
+                @endforeach
+                <th class="custom-table">Count</th>
+                <th class="custom-table">Teacher</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach($distribution['streams'] as $stream => $data)
+            <tr>
+                <td style="text-align: left; text-transform: capitalize;">{{ $stream }}</td>
+                <td>{{ number_format($data['mean_points'], 2) }}</td>
+                <td>{{ $data['grade'] }}</td>
+                @foreach($gradingSystem as $grade)
+                <td>{{ $data[$grade->grds_grade] }}</td>
+                @endforeach
+                <td>{{ $data['entries'] }}</td>
+                <td></td>
+            </tr>
+            @endforeach
+            <tr class="total-col">
+                <td style="text-align: left; text-transform: capitalize;">Total/Mean</td>
+                <td>{{ number_format($distribution['total']['mean_points'], 2) }}</td>
+                <td>{{ $distribution['total']['grade'] }}</td>
+                @foreach($gradingSystem as $grade)
+                <td>{{ $distribution['total'][$grade->grds_grade] }}</td>
+                @endforeach
+                <td>{{ $distribution['total']['entries'] }}</td>
+                <td></td>
+            </tr>
+        </tbody>
+    </table>
+    @endforeach
+
+    <!-- Grading System Reference -->
+    <h3 style="margin-top: 20px;">Grading System</h3>
+    <table>
+        <thead>
+            <tr>
+                <th style="text-align: left; text-transform: capitalize;">Grade</th>
+                <th>Points</th>
+                <th>Min Mark</th>
+                <th>Max Mark</th>
+                <th style="text-align: left; text-transform: capitalize;">Remarks</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach($gradingSystem as $grade)
+            <tr>
+                <td style="text-align: left; text-transform: capitalize;" class="grade-{{ $grade->grds_grade }}">{{ $grade->grds_grade }}</td>
+                <td>{{ $grade->grds_point }}</td>
+                <td>{{ $grade->grds_min }}</td>
+                <td>{{ $grade->grds_max }}</td>
+                <td style="text-align: left; text-transform: capitalize;">{{ $grade->grds_rem }} / {{ $grade->grds_lugha }}</td>
             </tr>
             @endforeach
         </tbody>

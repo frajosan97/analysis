@@ -4,7 +4,6 @@ use App\Http\Controllers\ExamController;
 use App\Http\Controllers\PdfController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ResultController;
-use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
@@ -19,7 +18,11 @@ Route::middleware('auth')->group(function () {
     ]);
 
     Route::get('/results/{exam}/{class}', [ResultController::class, 'index'])->name('results.index');
-    Route::get('/merit/{exam}/{class}', [PdfController::class, 'merit'])->name('pdf.merit');
+
+    Route::prefix('/pdf')->group(function () {
+        Route::get('/merit/{exam}/{class}', [PdfController::class, 'merit'])->name('pdf.merit');
+        Route::get('/analysis/{exam}/{class}', [PdfController::class, 'analysis'])->name('pdf.analysis');
+    });
 
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');

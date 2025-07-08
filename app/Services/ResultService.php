@@ -11,16 +11,22 @@ use Illuminate\Support\Facades\Log;
 
 class ResultService
 {
-    public function getSubjectGrade(float $marks): ?array
+    public function getSubjectGrade(float $marks, $gradeBy = 'marks'): ?array
     {
         try {
             $gradingCat = GradingCat::where('sch_token', 'kathekaboys')->first();
 
             if ($gradingCat) {
-                $grade = GradingSystem::where('grds_cat_key', $gradingCat->grd_key)
-                    ->where('grds_min', '<=', $marks)
-                    ->where('grds_max', '>=', $marks)
-                    ->first();
+                if ($gradeBy == 'points') {
+                    $grade = GradingSystem::where('grds_cat_key', $gradingCat->grd_key)
+                        ->where('grds_point', '<=', round($marks))
+                        ->first();
+                } else {
+                    $grade = GradingSystem::where('grds_cat_key', $gradingCat->grd_key)
+                        ->where('grds_min', '<=', $marks)
+                        ->where('grds_max', '>=', $marks)
+                        ->first();
+                }
 
                 if ($grade) {
                     return [
