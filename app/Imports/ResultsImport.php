@@ -107,7 +107,7 @@ class ResultsImport implements ToCollection, WithHeadingRow, WithValidation, Wit
             if ($hasUpdates) {
                 $result->update([
                     'scores' => $scores,
-                    'updated_at' => now()
+                    're_status' => 0
                 ]);
 
                 $this->updatedResults[] = $result->id;
