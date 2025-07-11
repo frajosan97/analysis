@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\ExamController;
+use App\Http\Controllers\ExcelController;
 use App\Http\Controllers\PdfController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ResultController;
@@ -22,6 +23,11 @@ Route::middleware('auth')->group(function () {
     Route::prefix('/pdf')->group(function () {
         Route::get('/merit/{exam}/{class}', [PdfController::class, 'merit'])->name('pdf.merit');
         Route::get('/analysis/{exam}/{class}', [PdfController::class, 'analysis'])->name('pdf.analysis');
+        Route::get('/report-form/{exam}/{class}', [PdfController::class, 'reportForm'])->name('pdf.report-form');
+    });
+
+    Route::prefix('/excel')->group(function () {
+        Route::post('/results-import', [ExcelController::class, 'import'])->name('results.import');
     });
 
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');

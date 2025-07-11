@@ -11,7 +11,7 @@ class Result extends Model
 
     protected $table = 'sch_results';
     protected $primaryKey = 'id';
-    
+
     protected $fillable = [
         'sch_token',
         're_key',

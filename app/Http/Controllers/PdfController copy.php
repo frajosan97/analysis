@@ -15,8 +15,12 @@ use Illuminate\Support\Facades\Log;
 
 class PdfController extends Controller
 {
-    protected $pdfService;
-    protected $resultService;
+    protected PdfService $pdfService;
+    protected ResultService $resultService;
+
+    // Constants for common values
+    private const SCHOOL_TOKEN = 'kathekaboys';
+    private const SCHOOL_NAME = 'Katheka Boys Secondary School';
 
     public function __construct(PdfService $pdfService, ResultService $resultService)
     {
@@ -71,35 +75,105 @@ class PdfController extends Controller
     }
 
     /**
+     * Generate reportForm PDF for a specific exam and class
+     *
+     * @param Request $request
+     * @param Exam $exam
+     * @param string $class
+     * @return \Illuminate\Http\Response|\Symfony\Component\HttpFoundation\BinaryFileResponse
+     */
+    public function reportForm(Request $request, Exam $exam, string $class)
+    {
+        try {
+            // Eager load term with the exam
+            $exam->load('term');
+
+            // Fetch students with their most recent results and related data
+            $students = Student::with([
+                'class',
+                'stream',
+                'results' => function ($query) use ($exam) {
+                    $query->where('re_exam', $exam->exam_key) // Filter results for the current exam
+                        ->orderBy('date', 'desc'); // Assuming 'created_at' is a better indicator of recency than 'date'
+                }
+            ])
+                ->where('sch_token', self::SCHOOL_TOKEN)
+                ->where('stud_form', $class)
+                ->get(); // No need for limit(2) if you want all students in the class
+
+            if ($students->isEmpty()) {
+                return back()->with('error', 'No students found for this class.');
+            }
+
+            $subjects = $this->getSubjects();
+            $gradingSystem = $this->getGradingSystem(); // Fetch grading system for potential use in report forms
+
+            $data = [
+                'title' => 'Report Forms',
+                'schoolInfo' => [
+                    'name' => self::SCHOOL_NAME,
+                    'moto' => 'strive to excel',
+                    'address' => '222-90200',
+                ],
+                'exam' => $exam,
+                'students' => $students,
+                'subjects' => $subjects,
+                'gradingSystem' => $gradingSystem, // Pass grading system for report form rendering
+                'generatedAt' => now()->format('Y-m-d H:i:s'),
+            ];
+
+            return $this->pdfService->generatePdfFromView(
+                'pdf.report-form',
+                $data,
+                "report-form-form-{$class}-term-{$exam->term->term}-{$exam->exam}.pdf",
+                'I',
+                'P'
+            );
+        } catch (\Throwable $th) {
+            return $this->handlePdfError($th, $exam, $class, 'report form');
+        }
+    }
+
+    /**
      * Prepare common PDF data structure
      */
     protected function preparePdfData(Exam $exam, string $class, string $titlePrefix): array
     {
-        $exam->load(['term']);
+        $exam->load('term');
         $results = $this->getResultsForClass($exam, $class);
 
+        // Pre-fetch all necessary grading system, streams, and subjects to avoid redundant queries in loops
+        $gradingSystem = $this->getGradingSystem();
+        $subjects = $this->getSubjects();
+
+        $studentsData = $results->map(function ($row) use ($gradingSystem) {
+            // Optimization: Avoid calling resultService->getSubjectGrade repeatedly for each subject if not needed
+            // If re_subC, re_tt, re_pnt, re_avgpnt, re_grade, re_sRank, re_fRank are directly available on $row,
+            // then fetching them like this is fine. If they involve complex calculations in ResultService,
+            // consider if they can be pre-calculated or stored.
+            return [
+                'adm' => $row->student->stud_adm,
+                'name' => $row->student->stud_lname . ' ' . $row->student->stud_fname,
+                'class' => $row->student->class->class . ' ' . $row->student->stream->stream,
+                'kcpe' => $row->student->stud_kcpe_marks,
+                'scores' => $this->prepareStudentScores($row), // Ensure this method is efficient
+                're_subC' => $row->re_subC,
+                're_tt' => $row->re_tt,
+                're_pnt' => $row->re_pnt,
+                're_avgpnt' => $row->re_avgpnt,
+                're_grade' => $row->re_grade,
+                're_sRank' => $row->re_sRank,
+                're_fRank' => $row->re_fRank,
+            ];
+        })->toArray(); // Convert to array early if no more collection operations are needed
+
         return [
-            'schoolName' => "Katheka Boys Secondary School",
+            'schoolName' => self::SCHOOL_NAME,
             'title' => "{$titlePrefix} - Term {$exam->term->term} - Form {$class}",
             'exam' => $exam,
             'class' => $class,
-            'subjects' => $this->getSubjects(),
-            'students' => $results->map(function ($row) {
-                return [
-                    'adm' => $row->student->stud_adm,
-                    'name' => $row->student->stud_lname . ' ' . $row->student->stud_fname,
-                    'class' => $row->student->class->class . ' ' . $row->student->stream->stream,
-                    'kcpe' => $row->student->stud_kcpe_marks,
-                    'scores' => $this->prepareStudentScores($row),
-                    're_subC' => $row->re_subC,
-                    're_tt' => $row->re_tt,
-                    're_pnt' => $row->re_pnt,
-                    're_avgpnt' => $row->re_avgpnt,
-                    're_grade' => $row->re_grade,
-                    're_sRank' => $row->re_sRank,
-                    're_fRank' => $row->re_fRank,
-                ];
-            }),
+            'subjects' => $subjects,
+            'students' => $studentsData,
             'printDate' => now()->format('D, d-m-Y h:i A'),
         ];
     }
@@ -145,7 +219,7 @@ class PdfController extends Controller
      */
     protected function calculateDistribution(
         $results,
-        $subjectCode,
+        ?string $subjectCode,
         $gradingSystem,
         $streams,
         bool $isSubjectDistribution
@@ -156,7 +230,7 @@ class PdfController extends Controller
 
         $distribution = [
             'total' => $this->initializeGradeCounts($gradingSystem),
-            'streams' => []
+            'streams' => [],
         ];
 
         foreach ($streams as $stream) {
@@ -166,17 +240,18 @@ class PdfController extends Controller
         foreach ($results as $result) {
             $stream = $result->student->stream->stream ?? 'Unknown';
             $value = $isSubjectDistribution
-                ? $result->{"re_s{$subjectCode}"} ?? 0
-                : $result->re_avgpnt ?? 0;
+                ? ($result->{"re_s{$subjectCode}"} ?? 0)
+                : ($result->re_avgpnt ?? 0);
 
-            $gradeInfo = $isSubjectDistribution
-                ? $this->resultService->getSubjectGrade($value)
-                : $this->resultService->getSubjectGrade($value, 'points');
+            // Directly determine grade here instead of relying on external service if logic is simple
+            // and `getSubjectGrade` isn't doing more complex lookups.
+            // If `getSubjectGrade` handles different grading systems or complex logic, keep it.
+            $gradeInfo = $this->resultService->getSubjectGrade($value, $isSubjectDistribution ? 'mark' : 'points');
 
-            $this->updateDistribution($distribution['total'], $gradeInfo, $value);
+            $this->updateDistribution($distribution['total'], $gradeInfo);
 
             if (isset($distribution['streams'][$stream])) {
-                $this->updateDistribution($distribution['streams'][$stream], $gradeInfo, $value);
+                $this->updateDistribution($distribution['streams'][$stream], $gradeInfo);
             }
         }
 
@@ -187,8 +262,9 @@ class PdfController extends Controller
 
     /**
      * Update distribution counts for a specific group
+     * Removed $value as it's not directly used for counting/points in this method, only gradeInfo.
      */
-    protected function updateDistribution(&$distribution, $gradeInfo, $value): void
+    protected function updateDistribution(&$distribution, array $gradeInfo): void
     {
         $distribution[$gradeInfo['grade']]++;
         $distribution['entries']++;
@@ -209,10 +285,11 @@ class PdfController extends Controller
 
     /**
      * Get results for a specific exam and class
+     * Eager load student, class, and stream to avoid N+1 query problem.
      */
     protected function getResultsForClass(Exam $exam, string $class)
     {
-        return Result::with(['student', 'student.class', 'student.stream'])
+        return Result::with(['student.class', 'student.stream'])
             ->where('re_exam', $exam->exam_key)
             ->where('re_studF', $class)
             ->orderBy('re_pnt', 'DESC')
@@ -222,30 +299,40 @@ class PdfController extends Controller
 
     /**
      * Get grading system configuration
+     * Cache this result if it's static or changes infrequently.
      */
     protected function getGradingSystem()
     {
-        return GradingSystem::where('sch_token', 'kathekaboys')
-            ->orderBy('grds_min', 'DESC')
-            ->get();
+        // Using `rememberForever` for static data
+        return \Illuminate\Support\Facades\Cache::rememberForever('grading_system', function () {
+            return GradingSystem::where('sch_token', self::SCHOOL_TOKEN)
+                ->orderBy('grds_min', 'DESC')
+                ->get();
+        });
     }
 
     /**
      * Get all streams
+     * Cache this result as well.
      */
     protected function getStreams()
     {
-        return Stream::where('sch_token', 'kathekaboys')->pluck('stream');
+        return \Illuminate\Support\Facades\Cache::rememberForever('school_streams', function () {
+            return Stream::where('sch_token', self::SCHOOL_TOKEN)->pluck('stream');
+        });
     }
 
     /**
      * Get all subjects
+     * Cache this result too.
      */
     protected function getSubjects()
     {
-        return Subject::with('systemSubject')
-            ->where('sch_token', 'kathekaboys')
-            ->get();
+        return \Illuminate\Support\Facades\Cache::rememberForever('school_subjects', function () {
+            return Subject::with('systemSubject')
+                ->where('sch_token', self::SCHOOL_TOKEN)
+                ->get();
+        });
     }
 
     /**
@@ -254,7 +341,7 @@ class PdfController extends Controller
     protected function handlePdfError(\Throwable $th, Exam $exam, string $class, string $type)
     {
         Log::error("Error generating {$type} PDF: " . $th->getMessage(), [
-            'exam' => $exam->id,
+            'exam_id' => $exam->id,
             'class' => $class,
             'trace' => $th->getTraceAsString()
         ]);
@@ -271,7 +358,8 @@ class PdfController extends Controller
             'entries' => 0,
             'total_points' => 0,
             'mean_points' => 0,
-            'grade' => 'E'
+            'grade' => 'E', // Default grade
+            'total_students' => 0, // Added for clarity, might be useful for percentages
         ];
 
         foreach ($gradingSystem as $grade) {
@@ -282,42 +370,16 @@ class PdfController extends Controller
     }
 
     /**
-     * Determine grade based on mark
-     */
-    protected function determineGrade($mark, $gradingSystem): array
-    {
-        foreach ($gradingSystem as $grade) {
-            if ($mark >= $grade->grds_min && $mark <= $grade->grds_max) {
-                return [
-                    'grade' => $grade->grds_grade,
-                    'points' => $grade->grds_point
-                ];
-            }
-        }
-
-        return [
-            'grade' => 'E',
-            'points' => 1
-        ];
-    }
-
-    /**
-     * Determine overall grade based on total points
-     */
-    protected function determineOverallGrade($totalPoints, $gradingSystem): array
-    {
-        $average = $totalPoints / 12;
-        return $this->determineGrade($average, $gradingSystem);
-    }
-
-    /**
      * Calculate metrics (mean points and overall grade)
+     * Renamed from `determineGrade` to reflect its purpose more accurately.
+     * Removed `determineOverallGrade` as this method now handles the logic.
      */
     protected function calculateMetrics(&$data, $gradingSystem): void
     {
         if ($data['entries'] > 0) {
             $data['mean_points'] = $data['total_points'] / $data['entries'];
 
+            // Find the grade based on mean_points
             foreach ($gradingSystem as $grade) {
                 if ($data['mean_points'] >= $grade->grds_point) {
                     $data['grade'] = $grade->grds_grade;
@@ -329,64 +391,13 @@ class PdfController extends Controller
 
     /**
      * Prepare student subject scores
+     * This method relies on ResultService, so ensure ResultService is optimized.
      */
     protected function prepareStudentScores(Result $result): array
     {
+        // Assuming getDroppedSubjects and getSubjectFields are efficient or cached within ResultService
         $droppedSubjects = $this->resultService->getDroppedSubjects($result->student);
         $subjectFields = $this->resultService->getSubjectFields();
         return $this->resultService->prepareSubjectScores($result, $droppedSubjects, $subjectFields);
-    }
-
-    /**
-     * Generate reportForm PDF for a specific exam and class
-     *
-     * @param \Illuminate\Http\Request $request
-     * @param \App\Models\Exam $exam
-     * @param string $class
-     * @return \Illuminate\Http\Response|\Symfony\Component\HttpFoundation\BinaryFileResponse
-     */
-    public function reportForm(Request $request, Exam $exam, string $class)
-    {
-        try {
-            // Load exam resource and its term
-            $exam->load(['term']);
-
-            // Get students with their 5 most recent results (ordered by date descending)
-            $students = Student::with(['results' => function ($query) {
-                $query->orderBy('date', 'desc')
-                    ->limit(5);
-            }])
-                ->where('sch_token', 'kathekaboys')
-                ->where('stud_form', $class)
-                // ->limit(2)
-                ->get();
-
-            $subjects = Subject::with('systemSubject')
-                ->where('sch_token', 'kathekaboys')
-                ->get();
-
-            $data = [
-                'title'       => 'Report Forms',
-                'schoolInfo' => [
-                    'name' => 'Katheka Boys Secondary School',
-                    'moto' => 'strive to excel',
-                    'address' => '222-90200',
-                ],
-                'exam'        => $exam,
-                'students'    => $students,
-                'subjects' => $subjects,
-                'generatedAt' => now()->format('Y-m-d H:i:s'),
-            ];
-
-            return $this->pdfService->generatePdfFromView(
-                'pdf.report-form',
-                $data,
-                "report-form-form-{$class}-term-{$exam->term->term}-{$exam->exam}.pdf",
-                'I',
-                'P'
-            );
-        } catch (\Throwable $th) {
-            return $this->handlePdfError($th, $exam, $class, 'report form');
-        }
     }
 }

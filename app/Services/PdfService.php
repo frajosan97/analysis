@@ -45,6 +45,9 @@ class PdfService
                 ],
             ],
         ]);
+
+        // Set footer with page numbers
+        // $this->mpdf->SetFooter('Page {PAGENO} of {nbpg}');
     }
 
     /**
