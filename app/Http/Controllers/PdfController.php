@@ -173,6 +173,14 @@ class PdfController extends Controller
                 ? $this->resultService->getSubjectGrade($value)
                 : $this->resultService->getSubjectGrade($value, 'points');
 
+            // fallback if null
+            if (!$gradeInfo) {
+                $gradeInfo = [
+                    'grade' => 'X',
+                    'points' => 0
+                ];
+            }
+
             $this->updateDistribution($distribution['total'], $gradeInfo, $value);
 
             if (isset($distribution['streams'][$stream])) {
@@ -190,9 +198,11 @@ class PdfController extends Controller
      */
     protected function updateDistribution(&$distribution, $gradeInfo, $value): void
     {
-        $distribution[$gradeInfo['grade']]++;
-        $distribution['entries']++;
-        $distribution['total_points'] += $gradeInfo['points'];
+        if ($gradeInfo['points'] > 0) {
+            $distribution[$gradeInfo['grade']]++;
+            $distribution['entries']++;
+            $distribution['total_points'] += $gradeInfo['points'];
+        }
     }
 
     /**
@@ -352,10 +362,12 @@ class PdfController extends Controller
             $exam->load(['term']);
 
             // Get students with their 5 most recent results (ordered by date descending)
-            $students = Student::with(['results' => function ($query) {
-                $query->orderBy('date', 'desc')
-                    ->limit(5);
-            }])
+            $students = Student::with([
+                'results' => function ($query) {
+                    $query->orderBy('date', 'desc')
+                        ->limit(5);
+                }
+            ])
                 ->where('sch_token', 'kathekaboys')
                 ->where('stud_form', $class)
                 // ->limit(2)
@@ -366,14 +378,14 @@ class PdfController extends Controller
                 ->get();
 
             $data = [
-                'title'       => 'Report Forms',
+                'title' => 'Report Forms',
                 'schoolInfo' => [
                     'name' => 'Katheka Boys Secondary School',
                     'moto' => 'strive to excel',
                     'address' => '222-90200',
                 ],
-                'exam'        => $exam,
-                'students'    => $students,
+                'exam' => $exam,
+                'students' => $students,
                 'subjects' => $subjects,
                 'generatedAt' => now()->format('Y-m-d H:i:s'),
             ];
