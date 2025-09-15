@@ -78,6 +78,9 @@ class PdfController extends Controller
         $exam->load(['term']);
         $results = $this->getResultsForClass($exam, $class);
 
+        // ✅ Order by f_rank before mapping
+        $results = $results->sortBy('re_fRank');
+
         return [
             'schoolName' => "Katheka Boys Secondary School",
             'title' => "{$titlePrefix} - Term {$exam->term->term} - Form {$class}",
@@ -99,7 +102,7 @@ class PdfController extends Controller
                     're_sRank' => $row->re_sRank,
                     're_fRank' => $row->re_fRank,
                 ];
-            }),
+            })->values(), // reset keys after sort
             'printDate' => now()->format('D, d-m-Y h:i A'),
         ];
     }
