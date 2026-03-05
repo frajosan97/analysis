@@ -2,12 +2,14 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\ClassModel;
 use App\Models\Exam;
 use App\Models\GradingSystem;
 use App\Models\Result;
 use App\Models\Stream;
 use App\Models\Student;
 use App\Models\Subject;
+use App\Models\SubjectTeacher;
 use App\Services\PdfService;
 use App\Services\ResultService;
 use Illuminate\Http\Request;
@@ -50,13 +52,20 @@ class PdfController extends Controller
     public function analysis(Request $request, Exam $exam, string $class)
     {
         try {
-            $results = $this->getResultsForClass($exam, $class);
+            $results = $this->getResultsForClass(
+                $exam,
+                $class
+            );
 
             if ($results->isEmpty()) {
                 return back()->with('error', 'No results found for this class and exam.');
             }
 
-            $data = $this->prepareAnalysisData($exam, $class, $results);
+            $data = $this->prepareAnalysisData(
+                $exam,
+                $class,
+                $results
+            );
 
             return $this->pdfService->generatePdfFromView(
                 'pdf.analysis',
@@ -120,24 +129,37 @@ class PdfController extends Controller
         foreach ($subjects as $subject) {
             $subjectCode = $subject->systemSubject->sub_code;
             $subjectName = $subject->systemSubject->sub_name;
-            $gradeDistribution[$subjectName] = $this->calculateDistribution(
+            $distribution = $this->calculateDistribution(
                 $results,
                 $subjectCode,
                 $gradingSystem,
+                $class,
                 $streams,
                 true
             );
+
+            $gradeDistribution[$subjectName] = is_array($distribution)
+                ? $distribution
+                : [];
         }
 
-        $data = $this->preparePdfData($exam, $class, 'Analysis');
+        $data = $this->preparePdfData(
+            $exam,
+            $class,
+            'Analysis'
+        );
+
         $data['gradeDistribution'] = $gradeDistribution;
+
         $data['overallDistribution'] = $this->calculateDistribution(
             $results,
             null,
             $gradingSystem,
+            $class,
             $streams,
             false
         );
+
         $data['gradingSystem'] = $gradingSystem;
 
         return $data;
@@ -150,6 +172,7 @@ class PdfController extends Controller
         $results,
         $subjectCode,
         $gradingSystem,
+        $form = null,
         $streams,
         bool $isSubjectDistribution
     ): array {
@@ -163,7 +186,34 @@ class PdfController extends Controller
         ];
 
         foreach ($streams as $stream) {
-            $distribution['streams'][$stream] = $this->initializeGradeCounts($gradingSystem);
+            $distribution['streams'][$stream] = $this->initializeGradeCounts(
+                $gradingSystem
+            );
+
+            $streamInfo = Stream::where('stream', $stream)->first();
+
+            if ($streamInfo) {
+                // class teacher
+                $classTeaher = ClassModel::with('teacher')
+                    ->where('class', $form)
+                    ->where('stream', $streamInfo->str_key)
+                    ->first();
+
+                if ($classTeaher) {
+                    $distribution['streams'][$stream]['class_teacher'] = $classTeaher->teacher->full_name;
+                }
+            }
+
+            // stream subject teacher
+            $subjectName = SubjectTeacher::with('teacher')
+                ->where('tsub_form', $form)
+                ->where('tsub_stream', $stream)
+                ->where('tsub_code', $subjectCode)
+                ->first();
+
+            if ($subjectName) {
+                $distribution['streams'][$stream]['subject_teacher'] = $subjectName->teacher->full_name;
+            }
         }
 
         foreach ($results as $result) {
@@ -184,14 +234,25 @@ class PdfController extends Controller
                 ];
             }
 
-            $this->updateDistribution($distribution['total'], $gradeInfo, $value);
+            $this->updateDistribution(
+                $distribution['total'],
+                $gradeInfo,
+                $value
+            );
 
             if (isset($distribution['streams'][$stream])) {
-                $this->updateDistribution($distribution['streams'][$stream], $gradeInfo, $value);
+                $this->updateDistribution(
+                    $distribution['streams'][$stream],
+                    $gradeInfo,
+                    $value
+                );
             }
         }
 
-        $this->finalizeDistribution($distribution, $gradingSystem);
+        $this->finalizeDistribution(
+            $distribution,
+            $gradingSystem
+        );
 
         return $distribution;
     }

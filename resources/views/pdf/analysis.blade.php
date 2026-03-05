@@ -3,26 +3,20 @@
 
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{ $title }}</title>
+
     <style>
         body {
             font-family: 'DejaVu Sans', sans-serif;
             font-size: 10pt;
             color: #333;
-            line-height: 1.4;
-            white-space: nowrap;
+            line-height: 1.5;
         }
 
-        td {
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
-
+        /* ---------- HEADER ---------- */
         .header {
             text-align: center;
-            margin-bottom: 15px;
+            margin-bottom: 20px;
             padding-bottom: 10px;
             border-bottom: 2px solid #3a7bd55d;
         }
@@ -31,155 +25,157 @@
             font-size: 18pt;
             font-weight: bold;
             color: #3a7bd5;
-            margin-bottom: 5px;
             text-transform: uppercase;
         }
 
         .report-title {
             font-size: 14pt;
             font-weight: bold;
-            color: #333;
-            margin-bottom: 5px;
+            margin-top: 5px;
         }
 
         .exam-info {
             font-size: 11pt;
-            margin-bottom: 10px;
+            margin-top: 4px;
         }
 
         .date {
-            font-size: 10pt;
-            color: #666;
+            font-size: 9pt;
+            color: #777;
+            margin-top: 4px;
         }
 
+        /* ---------- SECTION TITLE ---------- */
+        h3 {
+            margin: 25px 0 10px;
+            font-size: 12pt;
+            border-left: 4px solid #3a7bd5;
+            padding-left: 8px;
+        }
+
+        /* ---------- TABLE ---------- */
         table {
             width: 100%;
             border-collapse: collapse;
-            margin-top: 15px;
+            margin-bottom: 20px;
         }
 
         th {
-            background-color: #3a7bd5;
-            color: white;
+            background: #3a7bd5;
+            color: #fff;
             font-weight: bold;
-            padding: 8px 5px;
-            text-align: center;
+            padding: 7px 5px;
             border: 1px solid #ddd;
+            text-align: center;
         }
 
         td {
             padding: 6px 5px;
             border: 1px solid #ddd;
             text-align: center;
+            font-size: 9.5pt;
         }
 
         tr:nth-child(even) {
-            background-color: #f8f9fa;
+            background: #f8f9fa;
         }
 
-        .position-col {
-            background-color: #f8f9fa;
-            font-weight: bold;
-        }
-
-        .total-col {
-            background-color: #e9f5ff;
-            font-weight: bold;
-        }
-
-        .subject-score {
-            min-width: 40px;
-        }
-
-        .footer {
-            margin-top: 15px;
+        .left {
             text-align: left;
             text-transform: capitalize;
-            font-size: 9pt;
-            color: #666;
+        }
+
+        .nowrap {
+            white-space: nowrap;
+        }
+
+        .total-row {
+            background: #e9f5ff !important;
+            font-weight: bold;
+        }
+
+        .subject-header {
+            text-transform: capitalize;
+            font-weight: bold;
+            text-align: left;
+            padding: 6px;
+            font-size: 11pt;
+        }
+
+        /* ---------- FOOTER ---------- */
+        .footer {
+            margin-top: 30px;
             border-top: 1px solid #ddd;
-            padding-top: 5px;
+            padding-top: 15px;
+            font-size: 9pt;
+        }
+
+        .signature-table td {
+            border: none;
+            padding: 15px 10px;
+            text-align: center;
         }
 
         .signature-line {
-            width: 200px;
-            height: 1em;
-            display: inline-block;
-            margin: 20px 10px 0;
-        }
-
-        .highlight {
-            background-color: #fffacd;
-        }
-
-        .dropped {
-            color: #999;
-            text-decoration: line-through;
-        }
-
-        .footer td {
-            text-align: left;
-            text-transform: capitalize;
-            padding: 20px 20px 20px 0;
-            border: 0px;
-        }
-
-        .footer tr:nth-child(even) {
-            background-color: none;
-        }
-
-        .custom-table {
-            text-align: left;
-            text-transform: capitalize;
-            width: 10%;
+            margin-top: 30px;
+            border-top: 1px solid #000;
+            padding-top: 5px;
+            width: 80%;
+            margin-left: auto;
+            margin-right: auto;
         }
     </style>
 </head>
 
 <body>
+
+    <!-- HEADER -->
     <div class="header">
         <div class="school-name">{{ $schoolName }}</div>
         <div class="report-title">PERFORMANCE ANALYSIS</div>
         <div class="exam-info">
-            Form {{ $class }} Term {{ $exam->term->term }} {{ $exam->exam }}
+            Form {{ $class }} | Term {{ $exam->term->term }} | {{ $exam->exam }}
         </div>
-        <div class="date">Generated on: {{ now()->format('d/m/Y H:i') }}</div>
+        <div class="date">
+            Generated on: {{ now()->format('d/m/Y H:i') }}
+        </div>
     </div>
 
-    <!-- Overall Performance Summary -->
+    <!-- OVERALL PERFORMANCE -->
     <h3>Overall Performance Summary</h3>
     <table>
         <thead>
             <tr>
-                <th class="custom-table">Stream</th>
-                <th class="custom-table">Mean Points</th>
-                <th class="custom-table" style="text-align: left;">Grade</th>
+                <th class="left">Stream</th>
+                <th>Mean</th>
+                <th>Grade</th>
                 @foreach($gradingSystem as $grade)
                     <th>{{ $grade->grds_grade }}</th>
                 @endforeach
-                <th class="custom-table">Count</th>
-                <th class="custom-table">Teacher</th>
+                <th>Count</th>
+                <th class="left">Teacher</th>
             </tr>
         </thead>
         <tbody>
             @foreach($overallDistribution['streams'] as $stream => $data)
                 @if($data['entries'] > 0)
                     <tr>
-                        <td style="text-align: left; text-transform: capitalize;">{{ $stream }}</td>
+                        <td class="left">{{ $stream }}</td>
                         <td>{{ number_format($data['mean_points'], 2) }}</td>
-                        <td style="text-align: left;">{{ $data['grade'] }}</td>
+                        <td>{{ $data['grade'] }}</td>
                         @foreach($gradingSystem as $grade)
                             <td>{{ $data[$grade->grds_grade] }}</td>
                         @endforeach
                         <td>{{ $data['entries'] }}</td>
-                        <td></td>
+                        <td class="left nowrap">{{ $data['class_teacher'] ?? '' }}</td>
                     </tr>
                 @endif
             @endforeach
-            <tr class="total-col">
-                <td style="text-align: left; text-transform: capitalize;">Total/Mean</td>
+
+            <tr class="total-row">
+                <td class="left">Total / Mean</td>
                 <td>{{ number_format($overallDistribution['total']['mean_points'], 2) }}</td>
-                <td style="text-align: left;">{{ $overallDistribution['total']['grade'] }}</td>
+                <td>{{ $overallDistribution['total']['grade'] }}</td>
                 @foreach($gradingSystem as $grade)
                     <td>{{ $overallDistribution['total'][$grade->grds_grade] }}</td>
                 @endforeach
@@ -189,46 +185,48 @@
         </tbody>
     </table>
 
-    <!-- Subject-wise Performance -->
-    <h3 style="margin-top: 20px;">Subject-wise Performance Analysis</h3>
+    <!-- SUBJECT PERFORMANCE -->
+    <h3>Subject-wise Performance Analysis</h3>
+
     @foreach($gradeDistribution as $subjectCode => $distribution)
         <table>
             <thead>
                 <tr>
-                    <th colspan="18" style="text-align: left; text-transform: capitalize;">
+                    <th colspan="{{ 6 + count($gradingSystem) }}" class="subject-header">
                         {{ $subjectCode }}
                     </th>
                 </tr>
                 <tr>
-                    <th class="custom-table">Stream</th>
-                    <th class="custom-table">Mean Points</th>
-                    <th class="custom-table" style="text-align: left;">Grade</th>
+                    <th class="left">Stream</th>
+                    <th>Mean</th>
+                    <th>Grade</th>
                     @foreach($gradingSystem as $grade)
                         <th>{{ $grade->grds_grade }}</th>
                     @endforeach
-                    <th class="custom-table">Count</th>
-                    <th class="custom-table">Teacher</th>
+                    <th>Count</th>
+                    <th class="left">Teacher</th>
                 </tr>
             </thead>
             <tbody>
                 @foreach($distribution['streams'] as $stream => $data)
                     @if($data['entries'] > 0)
                         <tr>
-                            <td style="text-align: left; text-transform: capitalize;">{{ $stream }}</td>
+                            <td class="left">{{ $stream }}</td>
                             <td>{{ number_format($data['mean_points'], 2) }}</td>
-                            <td style="text-align: left;">{{ $data['grade'] }}</td>
+                            <td>{{ $data['grade'] }}</td>
                             @foreach($gradingSystem as $grade)
                                 <td>{{ $data[$grade->grds_grade] }}</td>
                             @endforeach
                             <td>{{ $data['entries'] }}</td>
-                            <td></td>
+                            <td class="left nowrap">{{ $data['subject_teacher'] ?? '' }}</td>
                         </tr>
                     @endif
                 @endforeach
-                <tr class="total-col">
-                    <td style="text-align: left; text-transform: capitalize;">Total/Mean</td>
+
+                <tr class="total-row">
+                    <td class="left">Total / Mean</td>
                     <td>{{ number_format($distribution['total']['mean_points'], 2) }}</td>
-                    <td style="text-align: left;">{{ $distribution['total']['grade'] }}</td>
+                    <td>{{ $distribution['total']['grade'] }}</td>
                     @foreach($gradingSystem as $grade)
                         <td>{{ $distribution['total'][$grade->grds_grade] }}</td>
                     @endforeach
@@ -239,30 +237,9 @@
         </table>
     @endforeach
 
+    <!-- FOOTER -->
     <div class="footer">
-        <table>
-            <tr>
-                <td>
-                    <div class="signature-line">Prepared By:__________________________________</div>
-                </td>
-                <td>
-                    <div class="signature-line">Approved By:__________________________________</div>
-                </td>
-                <td>
-                    <div class="signature-line">Approved By:__________________________________</div>
-                </td>
-            </tr>
-            <tr>
-                <td>
-                    <div class="signature-line">Signature:__________________________________</div>
-                </td>
-                <td>
-                    <div class="signature-line">Signature:____________________________________</div>
-                </td>
-                <td>
-                    <div class="signature-line">Signature:____________________________________</div>
-                </td>
-            </tr>
+        <table class="signature-table">
             <tr>
                 <td>
                     <div class="signature-line">Class Teacher</div>
@@ -276,6 +253,7 @@
             </tr>
         </table>
     </div>
+
 </body>
 
 </html>

@@ -31,6 +31,11 @@ class Subject extends Model
         return $this->belongsTo(SysSubject::class, 'sch_sub_code', 'sub_code');
     }
 
+    public function subjectTeacher()
+    {
+        return $this->belongsTo(SubjectTeacher::class, 'sch_sub_code', 'tsub_code');
+    }
+
     /**
      * Get the grading categories for this subject
      */

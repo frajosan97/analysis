@@ -11,7 +11,7 @@ class ClassModel extends Model
 
     protected $table = 'sch_classes';
     protected $primaryKey = 'id';
-    
+
     protected $fillable = [
         'sch_token',
         'cl_key',
@@ -39,5 +39,10 @@ class ClassModel extends Model
     public function students()
     {
         return $this->hasMany(Student::class, 'stud_form', 'class');
+    }
+
+    public function teacher()
+    {
+        return $this->belongsTo(Teacher::class, 'class_teacher', 'user_key');
     }
 }
